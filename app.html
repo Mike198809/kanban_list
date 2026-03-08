@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+
+<title>Mi App</title>
+
+<link rel="icon" href="list.png">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:-apple-system, BlinkMacSystemFont, sans-serif;
+margin:0;
+background:#f2f2f2;
+padding-bottom:70px;
+}
+
+header{
+text-align:center;
+padding:12px;
+font-size:18px;
+font-weight:bold;
+background:white;
+}
+
+.page{display:none;}
+.active{display:block;}
+
+.column{
+background:white;
+margin:8px;
+padding:8px;
+border-radius:10px;
+}
+
+h3{
+margin:5px 0 8px 0;
+font-size:16px;
+}
+
+.task{
+display:flex;
+align-items:center;
+justify-content:space-between;
+background:#eee;
+padding:8px;
+margin:4px 0;
+border-radius:6px;
+font-size:14px;
+}
+
+.statusDot{
+width:8px;
+height:8px;
+border-radius:50%;
+display:inline-block;
+margin-right:6px;
+}
+
+.red{background:red;}
+.yellow{background:orange;}
+.green{background:green;}
+
+button{
+border:none;
+padding:6px 8px;
+border-radius:5px;
+background:#333;
+color:white;
+font-size:13px;
+}
+
+.addArea{
+display:flex;
+gap:5px;
+padding:8px;
+flex-wrap:wrap;
+}
+
+input,select{
+padding:8px;
+font-size:14px;
+border-radius:6px;
+border:1px solid #ccc;
+}
+
+input{
+flex:1;
+}
+
+.navbar{
+position:fixed;
+bottom:0;
+width:100%;
+background:#222;
+display:flex;
+justify-content:space-around;
+padding:8px 0;
+}
+
+.navbar div{
+color:white;
+text-align:center;
+font-size:12px;
+}
+
+.gasto{
+background:white;
+padding:8px;
+margin:8px;
+border-radius:6px;
+font-size:14px;
+display:flex;
+justify-content:space-between;
+}
+
+.resumen{
+background:white;
+margin:8px;
+padding:8px;
+border-radius:6px;
+font-size:15px;
+}
+
+canvas{
+max-width:100%;
+padding:10px;
+}
+
+textarea{
+width:95%;
+height:120px;
+margin:8px;
+border-radius:6px;
+padding:8px;
+font-size:14px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>Mi App</header>
+
+<!-- KANBAN -->
+
+<div id="kanbanPage" class="page active">
+
+<div class="addArea">
+<input id="taskInput" placeholder="Nueva tarea">
+<button onclick="addTask()">+</button>
+</div>
+
+<div class="column">
+<h3>Pendiente</h3>
+<div id="todo"></div>
+</div>
+
+<div class="column">
+<h3>En proceso</h3>
+<div id="doing"></div>
+</div>
+
+<div class="column">
+<h3>Hecho</h3>
+<div id="done"></div>
+</div>
+
+</div>
+
+<!-- FINANZAS -->
+
+<div id="gastosPage" class="page">
+
+<div class="addArea">
+<input id="ingresosMensuales" type="number" placeholder="Ingresos €">
+<button onclick="guardarIngresos()">OK</button>
+</div>
+
+<div class="addArea">
+<select id="mesSelector" onchange="renderFinanzas()"></select>
+</div>
+
+<h3 style="padding-left:8px">Gastos fijos</h3>
+
+<div class="addArea">
+<input id="fijoNombre" placeholder="Concepto">
+<input id="fijoCantidad" type="number" placeholder="€">
+<button onclick="addFijo()">+</button>
+</div>
+
+<div id="listaFijos"></div>
+
+<h3 style="padding-left:8px">Variables</h3>
+
+<div class="addArea">
+<input id="varNombre" placeholder="Concepto">
+<input id="varCantidad" type="number" placeholder="€">
+
+<select id="varCategoria">
+<option value="comida">🍔</option>
+<option value="transporte">🚗</option>
+<option value="ocio">🎮</option>
+<option value="compras">🛒</option>
+<option value="otros">📦</option>
+</select>
+
+<button onclick="addVariable()">+</button>
+</div>
+
+<div id="listaVariables"></div>
+
+<div class="resumen">
+Ingresos: <span id="mostrarIngresos">0</span> €
+</div>
+
+<div class="resumen">
+Fijos: <span id="totalFijos">0</span> €
+</div>
+
+<div class="resumen">
+Variables: <span id="totalVariables">0</span> €
+</div>
+
+<div class="resumen">
+Disponible: <span id="dineroDisponible">0</span> €
+</div>
+
+<canvas id="graficoCategorias"></canvas>
+
+</div>
+
+<!-- NOTAS -->
+
+<div id="notasPage" class="page">
+<textarea id="notasArea"></textarea>
+</div>
+
+<div class="navbar">
+
+<div onclick="showPage('kanban')">
+📋<br>Kanban
+</div>
+
+<div onclick="showPage('gastos')">
+💰<br>Finanzas
+</div>
+
+<div onclick="showPage('notas')">
+📝<br>Notas
+</div>
+
+</div>
+
+<script>
+
+/* NAVEGACION */
+
+function showPage(page){
+document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"))
+document.getElementById(page+"Page").classList.add("active")
+}
+
+/* KANBAN */
+
+let tasks = JSON.parse(localStorage.getItem("kanban")) || {
+todo:[],
+doing:[],
+done:[]
+}
+
+function saveKanban(){
+localStorage.setItem("kanban",JSON.stringify(tasks))
+}
+
+function deleteTask(col,i){
+tasks[col].splice(i,1)
+saveKanban()
+renderKanban()
+}
+
+function renderKanban(){
+
+["todo","doing","done"].forEach(col=>{
+document.getElementById(col).innerHTML=""
+})
+
+tasks.todo.forEach((t,i)=>{
+
+let div=document.createElement("div")
+div.className="task"
+
+div.innerHTML=`
+<span><span class="statusDot red"></span>${t}</span>
+<div>
+<button onclick="moveTask('todo','doing',${i})">➡</button>
+<button onclick="deleteTask('todo',${i})">🗑</button>
+</div>
+`
+
+todo.appendChild(div)
+
+})
+
+tasks.doing.forEach((t,i)=>{
+
+let div=document.createElement("div")
+div.className="task"
+
+div.innerHTML=`
+<div>
+<button onclick="moveTask('doing','todo',${i})">⬅</button>
+</div>
+
+<span><span class="statusDot yellow"></span>${t}</span>
+
+<div>
+<button onclick="moveTask('doing','done',${i})">➡</button>
+<button onclick="deleteTask('doing',${i})">🗑</button>
+</div>
+`
+
+doing.appendChild(div)
+
+})
+
+tasks.done.forEach((t,i)=>{
+
+let div=document.createElement("div")
+div.className="task"
+
+div.innerHTML=`
+<div>
+<button onclick="moveTask('done','doing',${i})">⬅</button>
+</div>
+
+<span><span class="statusDot green"></span>${t}</span>
+
+<button onclick="deleteTask('done',${i})">🗑</button>
+`
+
+done.appendChild(div)
+
+})
+
+}
+
+function addTask(){
+
+let text=document.getElementById("taskInput").value
+if(!text) return
+
+tasks.todo.push(text)
+document.getElementById("taskInput").value=""
+
+saveKanban()
+renderKanban()
+
+}
+
+function moveTask(from,to,i){
+
+tasks[to].push(tasks[from][i])
+tasks[from].splice(i,1)
+
+saveKanban()
+renderKanban()
+
+}
+
+renderKanban()
+
+/* FINANZAS */
+
+let ingresos = localStorage.getItem("ingresos") || 0
+let gastosFijos = JSON.parse(localStorage.getItem("fijos")) || []
+let variablesMes = JSON.parse(localStorage.getItem("variablesMes")) || {}
+
+let grafico
+
+function mesActual(){
+let d=new Date()
+return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')
+}
+
+function guardarIngresos(){
+
+ingresos=document.getElementById("ingresosMensuales").value
+localStorage.setItem("ingresos",ingresos)
+
+renderFinanzas()
+
+}
+
+function addFijo(){
+
+let nombre=document.getElementById("fijoNombre").value
+let cantidad=document.getElementById("fijoCantidad").value
+
+if(!nombre || !cantidad) return
+
+gastosFijos.push({nombre,cantidad})
+
+localStorage.setItem("fijos",JSON.stringify(gastosFijos))
+
+document.getElementById("fijoNombre").value=""
+document.getElementById("fijoCantidad").value=""
+
+renderFinanzas()
+
+}
+
+function addVariable(){
+
+let mes=document.getElementById("mesSelector").value
+
+let nombre=document.getElementById("varNombre").value
+let cantidad=document.getElementById("varCantidad").value
+let categoria=document.getElementById("varCategoria").value
+
+if(!variablesMes[mes]) variablesMes[mes]=[]
+
+variablesMes[mes].push({nombre,cantidad,categoria})
+
+localStorage.setItem("variablesMes",JSON.stringify(variablesMes))
+
+document.getElementById("varNombre").value=""
+document.getElementById("varCantidad").value=""
+
+renderFinanzas()
+
+}
+
+function renderMeses(){
+
+let selector=document.getElementById("mesSelector")
+
+let meses=new Set(Object.keys(variablesMes))
+meses.add(mesActual())
+
+selector.innerHTML=""
+
+meses.forEach(m=>{
+let opt=document.createElement("option")
+opt.value=m
+opt.textContent=m
+selector.appendChild(opt)
+})
+
+selector.value=mesActual()
+
+}
+
+function renderFinanzas(){
+
+renderMeses()
+
+let mes=document.getElementById("mesSelector").value
+
+let totalFijos=0
+let totalVariables=0
+
+let categorias={}
+
+let listaFijos=document.getElementById("listaFijos")
+listaFijos.innerHTML=""
+
+gastosFijos.forEach(g=>{
+totalFijos+=Number(g.cantidad)
+
+let div=document.createElement("div")
+div.className="gasto"
+div.textContent=g.nombre+" - "+g.cantidad+" €"
+
+listaFijos.appendChild(div)
+})
+
+let listaVariables=document.getElementById("listaVariables")
+listaVariables.innerHTML=""
+
+if(variablesMes[mes]){
+
+variablesMes[mes].forEach(v=>{
+
+totalVariables+=Number(v.cantidad)
+
+if(!categorias[v.categoria]) categorias[v.categoria]=0
+categorias[v.categoria]+=Number(v.cantidad)
+
+let div=document.createElement("div")
+div.className="gasto"
+div.textContent=v.nombre+" - "+v.cantidad+" € ("+v.categoria+")"
+
+listaVariables.appendChild(div)
+
+})
+
+}
+
+document.getElementById("mostrarIngresos").textContent=ingresos
+document.getElementById("totalFijos").textContent=totalFijos
+document.getElementById("totalVariables").textContent=totalVariables
+
+let disponible = ingresos - totalFijos - totalVariables
+document.getElementById("dineroDisponible").textContent=disponible
+
+let ctx=document.getElementById("graficoCategorias")
+
+let labels=Object.keys(categorias)
+let data=Object.values(categorias)
+
+if(grafico) grafico.destroy()
+
+grafico=new Chart(ctx,{
+type:'bar',
+data:{labels:labels,datasets:[{data:data}]},
+options:{indexAxis:'y',plugins:{legend:{display:false}}}
+})
+
+}
+
+renderFinanzas()
+
+/* NOTAS */
+
+let notasArea=document.getElementById("notasArea")
+
+notasArea.value = localStorage.getItem("notas") || ""
+
+notasArea.addEventListener("input",()=>{
+localStorage.setItem("notas",notasArea.value)
+})
+
+</script>
+
+</body>
+</html>

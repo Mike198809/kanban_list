@@ -4,7 +4,7 @@
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Mi App</title>
 
@@ -15,7 +15,7 @@
 <style>
 
 body{
-font-family:-apple-system, BlinkMacSystemFont, sans-serif;
+font-family:-apple-system,BlinkMacSystemFont,sans-serif;
 margin:0;
 background:#f2f2f2;
 padding-bottom:70px;
@@ -118,6 +118,7 @@ border-radius:6px;
 font-size:14px;
 display:flex;
 justify-content:space-between;
+align-items:center;
 }
 
 .resumen{
@@ -140,6 +141,25 @@ margin:8px;
 border-radius:6px;
 padding:8px;
 font-size:14px;
+}
+
+/* modo oscuro */
+
+@media (prefers-color-scheme: dark){
+
+body{background:#121212;color:white}
+
+.column,
+.gasto,
+.resumen,
+header{
+background:#1e1e1e;
+}
+
+.task{
+background:#2a2a2a;
+}
+
 }
 
 </style>
@@ -182,11 +202,11 @@ font-size:14px;
 
 <div class="addArea">
 <input id="ingresosMensuales" type="number" placeholder="Ingresos €">
-<button onclick="guardarIngresos()">OK</button>
+<button onclick="guardarIngresos()">Guardar</button>
 </div>
 
-<div class="addArea">
-<select id="mesSelector" onchange="renderFinanzas()"></select>
+<div class="resumen">
+Ingresos: <span id="mostrarIngresos">0</span> €
 </div>
 
 <h3 style="padding-left:8px">Gastos fijos</h3>
@@ -219,10 +239,6 @@ font-size:14px;
 <div id="listaVariables"></div>
 
 <div class="resumen">
-Ingresos: <span id="mostrarIngresos">0</span> €
-</div>
-
-<div class="resumen">
 Fijos: <span id="totalFijos">0</span> €
 </div>
 
@@ -231,10 +247,10 @@ Variables: <span id="totalVariables">0</span> €
 </div>
 
 <div class="resumen">
-Disponible: <span id="dineroDisponible">0</span> €
+Ahorro: <span id="dineroDisponible">0</span> €
 </div>
 
-<canvas id="graficoCategorias"></canvas>
+<canvas id="graficoFinanzas"></canvas>
 
 </div>
 
@@ -246,17 +262,9 @@ Disponible: <span id="dineroDisponible">0</span> €
 
 <div class="navbar">
 
-<div onclick="showPage('kanban')">
-📋<br>Kanban
-</div>
-
-<div onclick="showPage('gastos')">
-💰<br>Finanzas
-</div>
-
-<div onclick="showPage('notas')">
-📝<br>Notas
-</div>
+<div onclick="showPage('kanban')">📋<br>Kanban</div>
+<div onclick="showPage('gastos')">💰<br>Finanzas</div>
+<div onclick="showPage('notas')">📝<br>Notas</div>
 
 </div>
 
@@ -380,20 +388,16 @@ renderKanban()
 
 /* FINANZAS */
 
-let ingresos = localStorage.getItem("ingresos") || 0
+let ingresos = Number(localStorage.getItem("ingresos")) || 0
 let gastosFijos = JSON.parse(localStorage.getItem("fijos")) || []
-let variablesMes = JSON.parse(localStorage.getItem("variablesMes")) || {}
+let variables = JSON.parse(localStorage.getItem("variables")) || []
 
 let grafico
 
-function mesActual(){
-let d=new Date()
-return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')
-}
-
 function guardarIngresos(){
 
-ingresos=document.getElementById("ingresosMensuales").value
+ingresos = Number(document.getElementById("ingresosMensuales").value)
+
 localStorage.setItem("ingresos",ingresos)
 
 renderFinanzas()
@@ -403,7 +407,7 @@ renderFinanzas()
 function addFijo(){
 
 let nombre=document.getElementById("fijoNombre").value
-let cantidad=document.getElementById("fijoCantidad").value
+let cantidad=Number(document.getElementById("fijoCantidad").value)
 
 if(!nombre || !cantidad) return
 
@@ -411,118 +415,151 @@ gastosFijos.push({nombre,cantidad})
 
 localStorage.setItem("fijos",JSON.stringify(gastosFijos))
 
-document.getElementById("fijoNombre").value=""
-document.getElementById("fijoCantidad").value=""
-
 renderFinanzas()
+
+}
+
+function deleteFijo(i){
+
+gastosFijos.splice(i,1)
+localStorage.setItem("fijos",JSON.stringify(gastosFijos))
+renderFinanzas()
+
+}
+
+function editFijo(i){
+
+let nuevo=prompt("Nuevo importe",gastosFijos[i].cantidad)
+
+if(nuevo){
+gastosFijos[i].cantidad=Number(nuevo)
+localStorage.setItem("fijos",JSON.stringify(gastosFijos))
+renderFinanzas()
+}
 
 }
 
 function addVariable(){
 
-let mes=document.getElementById("mesSelector").value
-
 let nombre=document.getElementById("varNombre").value
-let cantidad=document.getElementById("varCantidad").value
+let cantidad=Number(document.getElementById("varCantidad").value)
 let categoria=document.getElementById("varCategoria").value
 
-if(!variablesMes[mes]) variablesMes[mes]=[]
+if(!nombre || !cantidad) return
 
-variablesMes[mes].push({nombre,cantidad,categoria})
+variables.push({nombre,cantidad,categoria})
 
-localStorage.setItem("variablesMes",JSON.stringify(variablesMes))
-
-document.getElementById("varNombre").value=""
-document.getElementById("varCantidad").value=""
+localStorage.setItem("variables",JSON.stringify(variables))
 
 renderFinanzas()
 
 }
 
-function renderMeses(){
+function deleteVariable(i){
 
-let selector=document.getElementById("mesSelector")
+variables.splice(i,1)
 
-let meses=new Set(Object.keys(variablesMes))
-meses.add(mesActual())
+localStorage.setItem("variables",JSON.stringify(variables))
 
-selector.innerHTML=""
+renderFinanzas()
 
-meses.forEach(m=>{
-let opt=document.createElement("option")
-opt.value=m
-opt.textContent=m
-selector.appendChild(opt)
-})
+}
 
-selector.value=mesActual()
+function editVariable(i){
+
+let nuevo=prompt("Nuevo importe",variables[i].cantidad)
+
+if(nuevo){
+
+variables[i].cantidad=Number(nuevo)
+
+localStorage.setItem("variables",JSON.stringify(variables))
+
+renderFinanzas()
+
+}
 
 }
 
 function renderFinanzas(){
 
-renderMeses()
-
-let mes=document.getElementById("mesSelector").value
-
-let totalFijos=0
-let totalVariables=0
-
-let categorias={}
-
 let listaFijos=document.getElementById("listaFijos")
 listaFijos.innerHTML=""
 
-gastosFijos.forEach(g=>{
-totalFijos+=Number(g.cantidad)
+let totalFijos=0
+
+gastosFijos.forEach((g,i)=>{
+
+totalFijos+=g.cantidad
 
 let div=document.createElement("div")
 div.className="gasto"
-div.textContent=g.nombre+" - "+g.cantidad+" €"
+
+div.innerHTML=`
+${g.nombre} - ${g.cantidad} €
+<div>
+<button onclick="editFijo(${i})">✏️</button>
+<button onclick="deleteFijo(${i})">🗑</button>
+</div>
+`
 
 listaFijos.appendChild(div)
+
 })
 
 let listaVariables=document.getElementById("listaVariables")
 listaVariables.innerHTML=""
 
-if(variablesMes[mes]){
+let totalVariables=0
 
-variablesMes[mes].forEach(v=>{
+variables.forEach((v,i)=>{
 
-totalVariables+=Number(v.cantidad)
-
-if(!categorias[v.categoria]) categorias[v.categoria]=0
-categorias[v.categoria]+=Number(v.cantidad)
+totalVariables+=v.cantidad
 
 let div=document.createElement("div")
 div.className="gasto"
-div.textContent=v.nombre+" - "+v.cantidad+" € ("+v.categoria+")"
+
+div.innerHTML=`
+${v.nombre} - ${v.cantidad} €
+<div>
+<button onclick="editVariable(${i})">✏️</button>
+<button onclick="deleteVariable(${i})">🗑</button>
+</div>
+`
 
 listaVariables.appendChild(div)
 
 })
 
-}
+let ahorro = ingresos - totalFijos - totalVariables
 
 document.getElementById("mostrarIngresos").textContent=ingresos
 document.getElementById("totalFijos").textContent=totalFijos
 document.getElementById("totalVariables").textContent=totalVariables
+document.getElementById("dineroDisponible").textContent=ahorro
 
-let disponible = ingresos - totalFijos - totalVariables
-document.getElementById("dineroDisponible").textContent=disponible
-
-let ctx=document.getElementById("graficoCategorias")
-
-let labels=Object.keys(categorias)
-let data=Object.values(categorias)
+let ctx=document.getElementById("graficoFinanzas")
 
 if(grafico) grafico.destroy()
 
 grafico=new Chart(ctx,{
-type:'bar',
-data:{labels:labels,datasets:[{data:data}]},
-options:{indexAxis:'y',plugins:{legend:{display:false}}}
+type:'doughnut',
+data:{
+labels:["Fijos","Variables","Ahorro"],
+datasets:[{
+data:[totalFijos,totalVariables,Math.max(0,ahorro)],
+backgroundColor:[
+"#ff8c00",
+"#e74c3c",
+"#3498db"
+]
+}]
+},
+options:{
+plugins:{
+legend:{position:'bottom'}
+}
+}
 })
 
 }
